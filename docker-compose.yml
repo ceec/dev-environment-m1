@@ -1,0 +1,110 @@
+version: '3'
+
+networks:
+  enstars:
+
+services:
+  enstars:
+    build:
+      context: .
+      dockerfile: nginx.dockerfile
+    container_name: enstars-nginx
+    ports:
+      - 9876:80
+    volumes:
+      - ./src:/var/www/html:delegated
+    depends_on:
+      - php
+      - mariadb
+    networks:
+      - enstars
+
+  mariadb:
+    image: mariadb:10.5.8
+    container_name: make-mariadb
+    restart: unless-stopped
+    tty: true
+    ports:
+      - 3306:3306
+    volumes:
+      - dbdata:/var/lib/mysql
+    environment:
+      MYSQL_HOST: localhost
+      MYSQL_DATABASE: homestead
+      MYSQL_USER: test
+      MYSQL_PASSWORD: test
+      MYSQL_ROOT_PASSWORD: test
+      SERVICE_TAGS: dev
+      SERVICE_NAME: mariadb
+    networks:
+      - enstars
+
+  phpmyadmin:
+    depends_on:
+     - mariadb
+    image: phpmyadmin/phpmyadmin
+    container_name: enstars-phpmyadmin
+    environment:
+      PMA_HOST: mariadb
+      UPLOAD_LIMIT: 40M
+    links:
+      - mariadb:mariadb
+    ports:
+      - 8998:80
+    restart: always
+    networks:
+      - enstars      
+
+  php:
+    build:
+      context: .
+      dockerfile: php.dockerfile
+    container_name: enstars-php
+    volumes:
+      - ./src:/var/www/html:delegated
+    networks:
+      - enstars
+
+  composer:
+    build:
+      context: .
+      dockerfile: composer.dockerfile
+    container_name: enstars-composer
+    volumes:
+      - ./src:/var/www/html
+    working_dir: /var/www/html
+    depends_on:
+      - php
+    user: laravel
+    entrypoint: ['composer', '--ignore-platform-reqs']
+    networks:
+      - enstars
+
+  npm:
+    image: node:13.7
+    container_name: enstars-npm
+    volumes:
+      - ./src:/var/www/html
+    working_dir: /var/www/html
+    entrypoint: ['npm']
+    networks:
+      - enstars
+
+  artisan:
+    build:
+      context: .
+      dockerfile: php.dockerfile
+    container_name: enstars-artisan
+    volumes:
+      - ./src:/var/www/html:delegated
+    depends_on:
+      - mariadb
+    working_dir: /var/www/html
+    user: laravel
+    entrypoint: ['php', '/var/www/html/artisan']
+    networks:
+      - enstars
+
+volumes:
+  dbdata:
+    driver: local
